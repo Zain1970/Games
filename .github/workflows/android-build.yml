@@ -1,0 +1,26 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build with Godot
+        uses: barichello/godot-ci@v6.1.1
+        with:
+          godot-version: 4.3.0
+          working-directory: .
+          export-name: GravityFlip.apk
+          preset: Android
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GravityFlip-Android
+          path: GravityFlip.apk
+          if-no-files-found: error
