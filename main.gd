@@ -349,6 +349,7 @@ func _advance_stage(next_stage: int) -> void:
 func _win_game() -> void:
     game_started = false
     wallet_coins += score
+    _save_game()
     if best_score < score:
         best_score = score
     if best_time <= 0.0 or elapsed < best_time:
@@ -371,6 +372,7 @@ func _take_damage() -> void:
 func _game_over() -> void:
     game_started = false
     wallet_coins += score
+    _save_game()
     _show_end_panel(false)
 
 func _show_end_panel(won: bool) -> void:
