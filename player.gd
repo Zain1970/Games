@@ -149,5 +149,5 @@ func _input(event: InputEvent) -> void:
             touch_id = -1
             touch_vector = Vector2.ZERO
     elif event is InputEventScreenDrag and event.index == touch_id:
-        var delta := event.position - touch_start
+        var delta: Vector2 = event.position - touch_start
         touch_vector = delta.limit_length(110.0) / 110.0
