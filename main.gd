@@ -15,6 +15,13 @@ var respawn_z := 4.0
 var selected_skin := 0
 var best_score := 0
 var best_time := 0.0
+var wallet_coins := 0
+var unlocked_skins: Array[bool] = [true, false, false, false, false]
+var sound_enabled := true
+var music_enabled := true
+var vibration_enabled := true
+var damage_cooldown := 0.0
+var skin_prices := [0, 25, 50, 100, 200]
 var hazards: Array[Area3D] = []
 var coins: Array[Area3D] = []
 var enemies: Array[Area3D] = []
@@ -31,6 +38,8 @@ var message_label: Label
 var jump_button: Button
 var pause_button: Button
 var skin_buttons: Array[Button] = []
+var shop_panel: Panel
+var settings_panel: Panel
 
 var skin_colors := [
     Color(0.20, 0.65, 1.0),
@@ -117,7 +126,7 @@ func _create_hud() -> void:
     hud = CanvasLayer.new()
     add_child(hud)
 
-    score_label = _label("العملات: 0", Vector2(24, 18), 26)
+    score_label = _label("العملات: 0  |  الرصيد: 0", Vector2(24, 18), 26)
     lives_label = _label("الحياة: ♥♥♥", Vector2(24, 52), 22)
     stage_label = _label("المرحلة: 1 / 10", Vector2(24, 82), 22)
     timer_label = _label("الوقت: 0:00", Vector2(24, 112), 20)
@@ -174,6 +183,22 @@ func _show_menu() -> void:
     subtitle.add_theme_font_size_override("font_size", 22)
     menu_panel.add_child(subtitle)
 
+    var shop := Button.new()
+    shop.text = "المتجر"
+    shop.position = Vector2(330, 350)
+    shop.size = Vector2(140, 65)
+    shop.add_theme_font_size_override("font_size", 22)
+    shop.pressed.connect(_show_shop)
+    menu_panel.add_child(shop)
+
+    var settings := Button.new()
+    settings.text = "الإعدادات"
+    settings.position = Vector2(810, 350)
+    settings.size = Vector2(140, 65)
+    settings.add_theme_font_size_override("font_size", 22)
+    settings.pressed.connect(_show_settings)
+    menu_panel.add_child(settings)
+
     var start := Button.new()
     start.text = "ابدأ اللعبة"
     start.position = Vector2(490, 350)
@@ -183,7 +208,7 @@ func _show_menu() -> void:
     menu_panel.add_child(start)
 
     var best := Label.new()
-    best.text = "أفضل نتيجة: %d عملة    |    أفضل وقت: %s" % [best_score, _format_time(best_time)]
+    best.text = "الرصيد: %d    |    أفضل نتيجة: %d    |    أفضل وقت: %s" % [wallet_coins, best_score, _format_time(best_time)]
     best.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     best.position = Vector2(0, 440)
     best.size = Vector2(1280, 40)
@@ -219,6 +244,16 @@ func _show_menu() -> void:
     menu_panel.add_child(info)
 
 func _select_skin(index: int) -> void:
+    if index < 0 or index >= skin_colors.size():
+        return
+    if not unlocked_skins[index]:
+        if wallet_coins >= skin_prices[index]:
+            wallet_coins -= skin_prices[index]
+            unlocked_skins[index] = true
+            message_label.text = "تم فتح شخصية %s!" % ["أزرق", "وردي", "أخضر", "ذهبي", "بنفسجي"][index]
+        else:
+            message_label.text = "تحتاج %d عملة لفتح هذه الشخصية." % skin_prices[index]
+            return
     selected_skin = index
     _refresh_skin_buttons()
     if is_instance_valid(player):
@@ -226,8 +261,14 @@ func _select_skin(index: int) -> void:
     _save_game()
 
 func _refresh_skin_buttons() -> void:
+    var names := ["أزرق", "وردي", "أخضر", "ذهبي", "بنفسجي"]
     for i in range(skin_buttons.size()):
-        skin_buttons[i].text = ("✓ " if i == selected_skin else "") + skin_buttons[i].text.replace("✓ ", "")
+        var label := names[i]
+        if not unlocked_skins[i]:
+            label += " 🔒 %d" % skin_prices[i]
+        elif i == selected_skin:
+            label = "✓ " + label
+        skin_buttons[i].text = label
 
 func _start_game() -> void:
     game_started = true
@@ -280,7 +321,8 @@ func _process(delta: float) -> void:
         return
 
     elapsed += delta
-    score_label.text = "العملات: %d" % score
+    damage_cooldown = maxf(0.0, damage_cooldown - delta)
+    score_label.text = "العملات: %d  |  الرصيد: %d" % [score, wallet_coins]
     lives_label.text = "الحياة: " + "♥".repeat(lives) + "♡".repeat(3 - lives)
     stage_label.text = "المرحلة: %d / %d" % [stage, TOTAL_STAGES]
     timer_label.text = "الوقت: %s" % _format_time(elapsed)
@@ -306,6 +348,7 @@ func _advance_stage(next_stage: int) -> void:
 
 func _win_game() -> void:
     game_started = false
+    wallet_coins += score
     if best_score < score:
         best_score = score
     if best_time <= 0.0 or elapsed < best_time:
@@ -314,6 +357,9 @@ func _win_game() -> void:
     _show_end_panel(true)
 
 func _take_damage() -> void:
+    if damage_cooldown > 0.0 or not game_started:
+        return
+    damage_cooldown = 1.25
     lives -= 1
     if lives <= 0:
         _game_over()
@@ -324,6 +370,7 @@ func _take_damage() -> void:
 
 func _game_over() -> void:
     game_started = false
+    wallet_coins += score
     _show_end_panel(false)
 
 func _show_end_panel(won: bool) -> void:
@@ -363,7 +410,12 @@ func _save_game() -> void:
     var data := {
         "best_score": best_score,
         "best_time": best_time,
-        "skin": selected_skin
+        "skin": selected_skin,
+        "wallet_coins": wallet_coins,
+        "unlocked_skins": unlocked_skins,
+        "sound_enabled": sound_enabled,
+        "music_enabled": music_enabled,
+        "vibration_enabled": vibration_enabled
     }
     var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
     if file:
@@ -382,6 +434,128 @@ func _load_save() -> void:
         best_score = int(parsed.get("best_score", 0))
         best_time = float(parsed.get("best_time", 0.0))
         selected_skin = clampi(int(parsed.get("skin", 0)), 0, skin_colors.size() - 1)
+        wallet_coins = maxi(0, int(parsed.get("wallet_coins", 0)))
+        var saved_unlocks = parsed.get("unlocked_skins", unlocked_skins)
+        if saved_unlocks is Array and saved_unlocks.size() == skin_colors.size():
+            for i in range(skin_colors.size()):
+                unlocked_skins[i] = bool(saved_unlocks[i])
+        unlocked_skins[0] = true
+        if not unlocked_skins[selected_skin]:
+            selected_skin = 0
+        sound_enabled = bool(parsed.get("sound_enabled", true))
+        music_enabled = bool(parsed.get("music_enabled", true))
+        vibration_enabled = bool(parsed.get("vibration_enabled", true))
+
+func _show_shop() -> void:
+    shop_panel = Panel.new()
+    shop_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    shop_panel.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+    hud.add_child(shop_panel)
+
+    var title := Label.new()
+    title.text = "متجر الشخصيات"
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    title.position = Vector2(0, 90)
+    title.size = Vector2(1280, 60)
+    title.add_theme_font_size_override("font_size", 40)
+    shop_panel.add_child(title)
+
+    var balance := Label.new()
+    balance.text = "رصيدك: %d عملة" % wallet_coins
+    balance.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    balance.position = Vector2(0, 155)
+    balance.size = Vector2(1280, 40)
+    balance.add_theme_font_size_override("font_size", 24)
+    shop_panel.add_child(balance)
+
+    var names := ["أزرق", "وردي", "أخضر", "ذهبي", "بنفسجي"]
+    for i in range(skin_colors.size()):
+        var b := Button.new()
+        b.text = names[i] + ("\nمفتوحة" if unlocked_skins[i] else "\nفتح بـ %d" % skin_prices[i])
+        b.position = Vector2(190 + i * 190, 250)
+        b.size = Vector2(165, 100)
+        b.modulate = skin_colors[i]
+        b.add_theme_font_size_override("font_size", 18)
+        b.pressed.connect(_shop_skin_pressed.bind(i, balance))
+        shop_panel.add_child(b)
+
+    var close := Button.new()
+    close.text = "إغلاق"
+    close.position = Vector2(490, 430)
+    close.size = Vector2(300, 65)
+    close.pressed.connect(_close_shop)
+    shop_panel.add_child(close)
+
+func _shop_skin_pressed(index: int, balance: Label) -> void:
+    if not unlocked_skins[index]:
+        if wallet_coins < skin_prices[index]:
+            balance.text = "رصيدك: %d — تحتاج %d عملة إضافية" % [wallet_coins, skin_prices[index] - wallet_coins]
+            return
+        wallet_coins -= skin_prices[index]
+        unlocked_skins[index] = true
+    selected_skin = index
+    if is_instance_valid(player):
+        player.set_skin(skin_colors[selected_skin])
+    balance.text = "رصيدك: %d عملة — الشخصية المختارة: %s" % [wallet_coins, ["أزرق", "وردي", "أخضر", "ذهبي", "بنفسجي"][index]]
+    _save_game()
+    _refresh_skin_buttons()
+
+func _close_shop() -> void:
+    if is_instance_valid(shop_panel):
+        shop_panel.queue_free()
+    if is_instance_valid(menu_panel):
+        _refresh_skin_buttons()
+
+func _show_settings() -> void:
+    settings_panel = Panel.new()
+    settings_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    hud.add_child(settings_panel)
+
+    var title := Label.new()
+    title.text = "الإعدادات"
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    title.position = Vector2(0, 120)
+    title.size = Vector2(1280, 60)
+    title.add_theme_font_size_override("font_size", 40)
+    settings_panel.add_child(title)
+
+    var sound := CheckButton.new()
+    sound.text = "المؤثرات الصوتية"
+    sound.button_pressed = sound_enabled
+    sound.position = Vector2(490, 220)
+    sound.size = Vector2(300, 60)
+    sound.toggled.connect(func(v): sound_enabled = v; _save_game())
+    settings_panel.add_child(sound)
+
+    var music := CheckButton.new()
+    music.text = "الموسيقى"
+    music.button_pressed = music_enabled
+    music.position = Vector2(490, 290)
+    music.size = Vector2(300, 60)
+    music.toggled.connect(func(v): music_enabled = v; _save_game())
+    settings_panel.add_child(music)
+
+    var vibration := CheckButton.new()
+    vibration.text = "الاهتزاز"
+    vibration.button_pressed = vibration_enabled
+    vibration.position = Vector2(490, 360)
+    vibration.size = Vector2(300, 60)
+    vibration.toggled.connect(func(v): vibration_enabled = v; _save_game())
+    settings_panel.add_child(vibration)
+
+    var note := Label.new()
+    note.text = "تم تجهيز الخيارات للحفظ، وسيتم ربط الصوت والاهتزاز بالمؤثرات عند إضافتها."
+    note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    note.position = Vector2(100, 440)
+    note.size = Vector2(1080, 50)
+    settings_panel.add_child(note)
+
+    var close := Button.new()
+    close.text = "إغلاق"
+    close.position = Vector2(490, 520)
+    close.size = Vector2(300, 65)
+    close.pressed.connect(func(): settings_panel.queue_free())
+    settings_panel.add_child(close)
 
 func _make_box(n: String, size: Vector3, pos: Vector3, color: Color) -> StaticBody3D:
     var body := StaticBody3D.new()
