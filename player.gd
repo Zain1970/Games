@@ -5,6 +5,10 @@ const ACCELERATION := 24.0
 const FRICTION := 20.0
 const JUMP_VELOCITY := 11.0
 const GRAVITY := 27.0
+const CEILING_Y := 6.0
+
+var gravity_direction := 1.0
+var gravity_flipping := false
 
 var touch_id := -1
 var touch_start := Vector2.ZERO
@@ -68,15 +72,30 @@ func set_mobile_right(active: bool) -> void:
     mobile_right = active
 
 func jump() -> void:
-    if is_on_floor():
-        velocity.y = JUMP_VELOCITY
+    if is_on_floor() or is_on_ceiling():
+        velocity.y = -JUMP_VELOCITY * gravity_direction
+
+func flip_gravity() -> void:
+    if gravity_flipping:
+        return
+    gravity_flipping = true
+    gravity_direction *= -1.0
+    velocity.y = -JUMP_VELOCITY * gravity_direction
+    var tween := create_tween()
+    tween.tween_property(self, "rotation:z", rotation.z + PI, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+    tween.tween_callback(func(): gravity_flipping = false)
+
+func is_gravity_down() -> bool:
+    return gravity_direction > 0.0
 
 func _physics_process(delta: float) -> void:
-    if not is_on_floor():
-        velocity.y -= GRAVITY * delta
+    if not is_on_floor() and not is_on_ceiling():
+        velocity.y -= GRAVITY * gravity_direction * delta
 
     if Input.is_action_just_pressed("jump"):
         jump()
+    if Input.is_key_pressed(KEY_G) and not gravity_flipping:
+        flip_gravity()
 
     var input_vec := _movement_input()
     var direction := Vector3(input_vec.x, 0, input_vec.y)
