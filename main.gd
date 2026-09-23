@@ -42,6 +42,7 @@ var stage_label: Label
 var timer_label: Label
 var message_label: Label
 var jump_button: Button
+var flip_button: Button
 var left_button: Button
 var right_button: Button
 var progress_bar: ProgressBar
@@ -85,6 +86,7 @@ func _build_world() -> void:
     add_child(sun)
 
     _make_box("Ground", Vector3(14, 0.5, 820), Vector3(0, -0.5, -405), Color(0.18, 0.50, 0.25))
+    _make_box("Ceiling", Vector3(14, 0.5, 820), Vector3(0, 7.0, -405), Color(0.20, 0.42, 0.58))
     _make_box("LeftWall", Vector3(0.7, 2.5, 820), Vector3(-7.2, 1.5, -405), Color(0.12, 0.30, 0.48))
     _make_box("RightWall", Vector3(0.7, 2.5, 820), Vector3(7.2, 1.5, -405), Color(0.12, 0.30, 0.48))
 
@@ -165,6 +167,21 @@ func _create_hud() -> void:
     jump_button.offset_bottom = -35
     jump_button.pressed.connect(_jump_player)
     hud.add_child(jump_button)
+
+    flip_button = Button.new()
+    flip_button.text = "قلب الجاذبية"
+    flip_button.position = Vector2(0, 0)
+    flip_button.size = Vector2(190, 75)
+    flip_button.anchor_left = 1.0
+    flip_button.anchor_right = 1.0
+    flip_button.anchor_top = 1.0
+    flip_button.anchor_bottom = 1.0
+    flip_button.offset_left = -385
+    flip_button.offset_right = -195
+    flip_button.offset_top = -110
+    flip_button.offset_bottom = -35
+    flip_button.pressed.connect(_flip_player)
+    hud.add_child(flip_button)
 
     left_button = Button.new()
     left_button.text = "◀"
@@ -403,6 +420,11 @@ func _jump_player() -> void:
     if game_started and not paused and is_instance_valid(player):
         player.jump()
 
+func _flip_player() -> void:
+    if game_started and not paused and is_instance_valid(player):
+        player.flip_gravity()
+        message_label.text = "الجاذبية: " + ("أسفل" if player.is_gravity_down() else "أعلى")
+
 func _process(delta: float) -> void:
     if not game_started or paused or not is_instance_valid(player):
         return
@@ -470,6 +492,7 @@ func _show_end_panel(won: bool) -> void:
     left_button.hide()
     right_button.hide()
     jump_button.hide()
+    flip_button.hide()
     pause_button.hide()
     progress_bar.hide()
     end_panel = Panel.new()
