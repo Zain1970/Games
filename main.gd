@@ -42,6 +42,9 @@ var stage_label: Label
 var timer_label: Label
 var message_label: Label
 var jump_button: Button
+var left_button: Button
+var right_button: Button
+var progress_bar: ProgressBar
 var pause_button: Button
 var skin_buttons: Array[Button] = []
 var shop_panel: Panel
@@ -90,6 +93,7 @@ func _build_world() -> void:
         var start_z := end_z + 80.0
         _build_stage(number, start_z, end_z)
         _make_goal(end_z)
+        _make_checkpoint_marker(end_z + 1.5, number)
 
 func _build_stage(number: int, start_z: float, end_z: float) -> void:
     var difficulty := float(number - 1) / 9.0
@@ -161,6 +165,39 @@ func _create_hud() -> void:
     jump_button.offset_bottom = -35
     jump_button.pressed.connect(_jump_player)
     hud.add_child(jump_button)
+
+    left_button = Button.new()
+    left_button.text = "◀"
+    left_button.position = Vector2(25, 0)
+    left_button.size = Vector2(90, 75)
+    left_button.anchor_top = 1.0
+    left_button.anchor_bottom = 1.0
+    left_button.offset_top = -110
+    left_button.offset_bottom = -35
+    left_button.button_down.connect(func(): if is_instance_valid(player): player.set_mobile_left(true))
+    left_button.button_up.connect(func(): if is_instance_valid(player): player.set_mobile_left(false))
+    hud.add_child(left_button)
+
+    right_button = Button.new()
+    right_button.text = "▶"
+    right_button.position = Vector2(125, 0)
+    right_button.size = Vector2(90, 75)
+    right_button.anchor_top = 1.0
+    right_button.anchor_bottom = 1.0
+    right_button.offset_top = -110
+    right_button.offset_bottom = -35
+    right_button.button_down.connect(func(): if is_instance_valid(player): player.set_mobile_right(true))
+    right_button.button_up.connect(func(): if is_instance_valid(player): player.set_mobile_right(false))
+    hud.add_child(right_button)
+
+    progress_bar = ProgressBar.new()
+    progress_bar.position = Vector2(280, 24)
+    progress_bar.size = Vector2(500, 18)
+    progress_bar.min_value = 0.0
+    progress_bar.max_value = 1.0
+    progress_bar.value = 0.0
+    progress_bar.show_percentage = false
+    hud.add_child(progress_bar)
 
 func _label(text_value: String, pos: Vector2, size: int) -> Label:
     var label := Label.new()
@@ -360,6 +397,9 @@ func _process(delta: float) -> void:
     lives_label.text = "الحياة: " + "♥".repeat(lives) + "♡".repeat(3 - lives)
     stage_label.text = "المرحلة: %d / %d" % [stage, TOTAL_STAGES]
     timer_label.text = "الوقت: %s" % _format_time(elapsed)
+    var stage_start := -80.0 * float(stage - 1) + 4.0
+    var stage_end := -80.0 * float(stage)
+    progress_bar.value = clampf((stage_start - player.position.z) / (stage_start - stage_end), 0.0, 1.0)
 
     if player.position.y < -5.0:
         _take_damage()
@@ -411,6 +451,11 @@ func _game_over() -> void:
     _show_end_panel(false)
 
 func _show_end_panel(won: bool) -> void:
+    left_button.hide()
+    right_button.hide()
+    jump_button.hide()
+    pause_button.hide()
+    progress_bar.hide()
     end_panel = Panel.new()
     end_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     hud.add_child(end_panel)
@@ -817,6 +862,31 @@ func _on_enemy(body: Node3D, enemy: Area3D) -> void:
         _take_damage()
         player.position = Vector3(0, 2, respawn_z)
         player.velocity = Vector3.ZERO
+
+func _make_checkpoint_marker(z: float, number: int) -> void:
+    var left := MeshInstance3D.new()
+    var pillar_mesh := BoxMesh.new()
+    pillar_mesh.size = Vector3(0.45, 4.0, 0.45)
+    left.mesh = pillar_mesh
+    left.position = Vector3(-5.5, 2.0, z)
+    var mat := StandardMaterial3D.new()
+    mat.albedo_color = Color(0.15, 0.85, 0.95)
+    mat.emission_enabled = true
+    mat.emission = Color(0.05, 0.45, 0.8)
+    mat.emission_energy_multiplier = 1.5
+    left.material_override = mat
+    add_child(left)
+
+    var right := left.duplicate()
+    right.position.x = 5.5
+    add_child(right)
+
+    var banner := Label3D.new()
+    banner.text = "CHECKPOINT %d" % number
+    banner.position = Vector3(0, 4.0, z)
+    banner.font_size = 48
+    banner.modulate = Color(0.7, 0.95, 1.0)
+    add_child(banner)
 
 func _make_goal(z: float) -> void:
     var portal := MeshInstance3D.new()
