@@ -9,6 +9,8 @@ const GRAVITY := 27.0
 var touch_id := -1
 var touch_start := Vector2.ZERO
 var touch_vector := Vector2.ZERO
+var mobile_left := false
+var mobile_right := false
 var camera: Camera3D
 var body_material: StandardMaterial3D
 
@@ -59,6 +61,12 @@ func set_skin(color: Color) -> void:
     if body_material:
         body_material.albedo_color = color
 
+func set_mobile_left(active: bool) -> void:
+    mobile_left = active
+
+func set_mobile_right(active: bool) -> void:
+    mobile_right = active
+
 func jump() -> void:
     if is_on_floor():
         velocity.y = JUMP_VELOCITY
@@ -92,6 +100,13 @@ func _movement_input() -> Vector2:
     var keyboard := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
     if keyboard.length() > 0.05:
         return keyboard
+    var mobile := Vector2.ZERO
+    if mobile_left:
+        mobile.x -= 1.0
+    if mobile_right:
+        mobile.x += 1.0
+    if mobile.length() > 0.05:
+        return mobile
     return touch_vector
 
 func _input(event: InputEvent) -> void:
