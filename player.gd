@@ -5,10 +5,10 @@ const ACCELERATION := 24.0
 const FRICTION := 20.0
 const JUMP_VELOCITY := 11.0
 const GRAVITY := 27.0
-const CEILING_Y := 6.0
 
 var gravity_direction := 1.0
 var gravity_flipping := false
+var gravity_flip_cooldown := 0.0
 
 var touch_id := -1
 var touch_start := Vector2.ZERO
@@ -19,6 +19,7 @@ var camera: Camera3D
 var body_material: StandardMaterial3D
 
 func _ready() -> void:
+    up_direction = Vector3.UP
     _create_body()
     _create_camera()
 
@@ -72,15 +73,20 @@ func set_mobile_right(active: bool) -> void:
     mobile_right = active
 
 func jump() -> void:
+    if gravity_flipping:
+        return
     if is_on_floor() or is_on_ceiling():
         velocity.y = -JUMP_VELOCITY * gravity_direction
 
 func flip_gravity() -> void:
-    if gravity_flipping:
+    if gravity_flipping or gravity_flip_cooldown > 0.0:
         return
     gravity_flipping = true
+    gravity_flip_cooldown = 0.35
     gravity_direction *= -1.0
+    up_direction = Vector3.UP * gravity_direction
     velocity.y = -JUMP_VELOCITY * gravity_direction
+
     var tween := create_tween()
     tween.tween_property(self, "rotation:z", rotation.z + PI, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
     tween.tween_callback(func(): gravity_flipping = false)
@@ -89,12 +95,14 @@ func is_gravity_down() -> bool:
     return gravity_direction > 0.0
 
 func _physics_process(delta: float) -> void:
+    gravity_flip_cooldown = maxf(0.0, gravity_flip_cooldown - delta)
+
     if not is_on_floor() and not is_on_ceiling():
         velocity.y -= GRAVITY * gravity_direction * delta
 
     if Input.is_action_just_pressed("jump"):
         jump()
-    if Input.is_key_pressed(KEY_G) and not gravity_flipping:
+    if Input.is_action_just_pressed("gravity_flip"):
         flip_gravity()
 
     var input_vec := _movement_input()
