@@ -1,6 +1,8 @@
 extends Node3D
 
 const PLAYER_SCRIPT = preload("res://player.gd")
+const SAVE_PATH := "user://savegame.json"
+const TOTAL_STAGES := 10
 
 var player: CharacterBody3D
 var score := 0
@@ -9,14 +11,17 @@ var stage := 1
 var elapsed := 0.0
 var paused := false
 var game_started := false
-var stage_targets := [100.0, 210.0, 330.0]
 var respawn_z := 4.0
+var selected_skin := 0
+var best_score := 0
+var best_time := 0.0
 var hazards: Array[Area3D] = []
 var coins: Array[Area3D] = []
 
 var hud: CanvasLayer
 var menu_panel: Panel
 var pause_panel: Panel
+var end_panel: Panel
 var score_label: Label
 var lives_label: Label
 var stage_label: Label
@@ -24,8 +29,18 @@ var timer_label: Label
 var message_label: Label
 var jump_button: Button
 var pause_button: Button
+var skin_buttons: Array[Button] = []
+
+var skin_colors := [
+    Color(0.20, 0.65, 1.0),
+    Color(1.0, 0.28, 0.45),
+    Color(0.30, 0.90, 0.45),
+    Color(1.0, 0.72, 0.15),
+    Color(0.70, 0.35, 1.0)
+]
 
 func _ready() -> void:
+    _load_save()
     _build_world()
     _create_player()
     _create_hud()
@@ -48,32 +63,41 @@ func _build_world() -> void:
     sun.shadow_enabled = true
     add_child(sun)
 
-    _make_box("Ground", Vector3(14, 0.5, 380), Vector3(0, -0.5, -185), Color(0.18, 0.50, 0.25))
-    _make_box("LeftWall", Vector3(0.7, 2.5, 380), Vector3(-7.2, 1.5, -185), Color(0.12, 0.30, 0.48))
-    _make_box("RightWall", Vector3(0.7, 2.5, 380), Vector3(7.2, 1.5, -185), Color(0.12, 0.30, 0.48))
+    _make_box("Ground", Vector3(14, 0.5, 820), Vector3(0, -0.5, -405), Color(0.18, 0.50, 0.25))
+    _make_box("LeftWall", Vector3(0.7, 2.5, 820), Vector3(-7.2, 1.5, -405), Color(0.12, 0.30, 0.48))
+    _make_box("RightWall", Vector3(0.7, 2.5, 820), Vector3(7.2, 1.5, -405), Color(0.12, 0.30, 0.48))
 
-    _build_stage(1, -55.0, -4.0)
-    _build_stage(2, -165.0, -105.0)
-    _build_stage(3, -285.0, -225.0)
-
-    _make_goal(-100.0, 1)
-    _make_goal(-210.0, 2)
-    _make_goal(-330.0, 3)
+    for number in range(1, TOTAL_STAGES + 1):
+        var end_z := -80.0 * number
+        var start_z := end_z + 80.0
+        _build_stage(number, start_z, end_z)
+        _make_goal(end_z)
 
 func _build_stage(number: int, start_z: float, end_z: float) -> void:
-    for i in range(7):
-        var z := start_z + float(i) * ((end_z - start_z) / 7.0)
-        var x := [-3.5, 0.0, 3.5, 2.0, -2.0, 0.0, 3.0][i]
-        _make_obstacle(Vector3(2.8, 0.8 + float(number) * 0.1, 1.4), Vector3(x, 0.7, z), Color(0.85, 0.25, 0.22))
-        _make_coin(Vector3(x, 1.8, z - 3.0))
+    var difficulty := float(number - 1) / 9.0
+    for i in range(9):
+        var z := start_z - float(i + 1) * 7.2
+        var x_options := [-4.0, -2.0, 0.0, 2.0, 4.0, 1.5, -1.5, 3.5, -3.5]
+        var x := x_options[(i + number) % x_options.size()]
+        var width := 2.6 - difficulty * 0.45
+        var height := 0.8 + difficulty * 0.5
+        _make_obstacle(Vector3(width, height, 1.3), Vector3(x, height / 2.0, z), Color(0.85, 0.25, 0.22))
 
-    for i in range(4):
-        var z := start_z + float(i + 1) * ((end_z - start_z) / 5.0)
-        _make_coin(Vector3(sin(float(i) * 2.0) * 4.0, 1.4, z))
+        if i % 2 == 0:
+            _make_coin(Vector3(x, 1.8 + difficulty, z - 2.5))
+
+    for i in range(5):
+        var z := start_z - 10.0 - float(i) * 13.0
+        var x := sin(float(i + number) * 1.7) * (4.0 - difficulty * 0.5)
+        _make_coin(Vector3(x, 1.5, z))
 
     if number >= 2:
-        _make_hazard(Vector3(-3.0, 1.0, start_z - 18.0), 3.0)
-        _make_hazard(Vector3(3.0, 1.0, start_z - 38.0), -3.5)
+        _make_hazard(Vector3(-3.0, 1.0, start_z - 28.0), 2.5 + difficulty * 2.5)
+    if number >= 4:
+        _make_hazard(Vector3(3.0, 1.0, start_z - 55.0), -(3.0 + difficulty * 2.0))
+
+    if number >= 6:
+        _make_box("Ramp", Vector3(3.5, 0.6, 5.0), Vector3(0, 0.3, start_z - 68.0), Color(0.30, 0.55, 0.90))
 
 func _create_player() -> void:
     player = CharacterBody3D.new()
@@ -81,6 +105,7 @@ func _create_player() -> void:
     player.set_script(PLAYER_SCRIPT)
     player.position = Vector3(0, 2, 4)
     add_child(player)
+    player.set_skin(skin_colors[selected_skin])
 
 func _create_hud() -> void:
     hud = CanvasLayer.new()
@@ -88,7 +113,7 @@ func _create_hud() -> void:
 
     score_label = _label("العملات: 0", Vector2(24, 18), 26)
     lives_label = _label("الحياة: ♥♥♥", Vector2(24, 52), 22)
-    stage_label = _label("المرحلة: 1", Vector2(24, 82), 22)
+    stage_label = _label("المرحلة: 1 / 10", Vector2(24, 82), 22)
     timer_label = _label("الوقت: 0:00", Vector2(24, 112), 20)
     message_label = _label("", Vector2(24, 148), 19)
 
@@ -130,41 +155,80 @@ func _show_menu() -> void:
     var title := Label.new()
     title.text = "مغامرات 3D"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.position = Vector2(0, 120)
-    title.size = Vector2(1280, 80)
+    title.position = Vector2(0, 80)
+    title.size = Vector2(1280, 70)
     title.add_theme_font_size_override("font_size", 48)
     menu_panel.add_child(title)
 
     var subtitle := Label.new()
-    subtitle.text = "اركض • اقفز • اجمع العملات • تجاوز العقبات"
+    subtitle.text = "10 مراحل • عقبات • عملات • تحديات متزايدة"
     subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    subtitle.position = Vector2(0, 205)
-    subtitle.size = Vector2(1280, 50)
+    subtitle.position = Vector2(0, 150)
+    subtitle.size = Vector2(1280, 45)
     subtitle.add_theme_font_size_override("font_size", 22)
     menu_panel.add_child(subtitle)
 
     var start := Button.new()
     start.text = "ابدأ اللعبة"
-    start.position = Vector2(490, 300)
-    start.size = Vector2(300, 80)
+    start.position = Vector2(490, 350)
+    start.size = Vector2(300, 75)
     start.add_theme_font_size_override("font_size", 28)
     start.pressed.connect(_start_game)
     menu_panel.add_child(start)
 
+    var best := Label.new()
+    best.text = "أفضل نتيجة: %d عملة    |    أفضل وقت: %s" % [best_score, _format_time(best_time)]
+    best.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    best.position = Vector2(0, 440)
+    best.size = Vector2(1280, 40)
+    best.add_theme_font_size_override("font_size", 18)
+    menu_panel.add_child(best)
+
+    var skin_title := Label.new()
+    skin_title.text = "اختر الشخصية"
+    skin_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    skin_title.position = Vector2(0, 215)
+    skin_title.size = Vector2(1280, 35)
+    skin_title.add_theme_font_size_override("font_size", 20)
+    menu_panel.add_child(skin_title)
+
+    var names := ["أزرق", "وردي", "أخضر", "ذهبي", "بنفسجي"]
+    for i in range(skin_colors.size()):
+        var b := Button.new()
+        b.text = names[i]
+        b.position = Vector2(280 + i * 145, 260)
+        b.size = Vector2(125, 55)
+        b.modulate = skin_colors[i]
+        b.pressed.connect(_select_skin.bind(i))
+        menu_panel.add_child(b)
+        skin_buttons.append(b)
+    _refresh_skin_buttons()
+
     var info := Label.new()
-    info.text = "التحكم: اسحب يسار الشاشة للحركة واضغط قفز للقفز"
+    info.text = "الهاتف: اسحب من يسار الشاشة للحركة واضغط قفز. الكمبيوتر: WASD + Space."
     info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    info.position = Vector2(0, 410)
+    info.position = Vector2(0, 495)
     info.size = Vector2(1280, 50)
-    info.add_theme_font_size_override("font_size", 18)
+    info.add_theme_font_size_override("font_size", 17)
     menu_panel.add_child(info)
+
+func _select_skin(index: int) -> void:
+    selected_skin = index
+    _refresh_skin_buttons()
+    if is_instance_valid(player):
+        player.set_skin(skin_colors[selected_skin])
+    _save_game()
+
+func _refresh_skin_buttons() -> void:
+    for i in range(skin_buttons.size()):
+        skin_buttons[i].text = ("✓ " if i == selected_skin else "") + skin_buttons[i].text.replace("✓ ", "")
 
 func _start_game() -> void:
     game_started = true
     menu_panel.hide()
     pause_button.show()
     jump_button.show()
-    message_label.text = "ابدأ! الهدف هو الوصول إلى البوابات الثلاث."
+    message_label.text = "ابدأ! أكمل المراحل العشر للوصول إلى النهاية."
 
 func _toggle_pause() -> void:
     if not game_started:
@@ -210,56 +274,38 @@ func _process(delta: float) -> void:
         return
 
     elapsed += delta
-    timer_label.text = "الوقت: %d:%02d" % [int(elapsed) / 60, int(elapsed) % 60]
     score_label.text = "العملات: %d" % score
     lives_label.text = "الحياة: " + "♥".repeat(lives) + "♡".repeat(3 - lives)
-    stage_label.text = "المرحلة: %d / 3" % stage
+    stage_label.text = "المرحلة: %d / %d" % [stage, TOTAL_STAGES]
+    timer_label.text = "الوقت: %s" % _format_time(elapsed)
 
     if player.position.y < -5.0:
         _take_damage()
 
-    if stage == 1 and player.position.z <= -100.0:
-        _advance_stage(2)
-    elif stage == 2 and player.position.z <= -210.0:
-        _advance_stage(3)
-    elif stage == 3 and player.position.z <= -330.0:
-        _win_game()
+    var target_z := -80.0 * float(stage)
+    if player.position.z <= target_z:
+        if stage < TOTAL_STAGES:
+            _advance_stage(stage + 1)
+        else:
+            _win_game()
 
 func _advance_stage(next_stage: int) -> void:
     stage = next_stage
-    respawn_z = [-4.0, -104.0, -214.0][stage - 1]
+    respawn_z = -80.0 * float(stage - 1) + 4.0
     player.position = Vector3(0, 2, respawn_z)
     player.velocity = Vector3.ZERO
-    message_label.text = "ممتاز! وصلت إلى المرحلة %d." % stage
+    lives = min(3, lives + 1)
+    message_label.text = "ممتاز! وصلت إلى المرحلة %d من %d." % [stage, TOTAL_STAGES]
+    _save_game()
 
 func _win_game() -> void:
     game_started = false
-    var win := Panel.new()
-    win.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    hud.add_child(win)
-
-    var title := Label.new()
-    title.text = "🎉 فزت!"
-    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.position = Vector2(0, 180)
-    title.size = Vector2(1280, 80)
-    title.add_theme_font_size_override("font_size", 50)
-    win.add_child(title)
-
-    var stats := Label.new()
-    stats.text = "العملات: %d\nالوقت: %d:%02d" % [score, int(elapsed) / 60, int(elapsed) % 60]
-    stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    stats.position = Vector2(0, 280)
-    stats.size = Vector2(1280, 100)
-    stats.add_theme_font_size_override("font_size", 26)
-    win.add_child(stats)
-
-    var again := Button.new()
-    again.text = "العب من جديد"
-    again.position = Vector2(490, 430)
-    again.size = Vector2(300, 70)
-    again.pressed.connect(func(): get_tree().reload_current_scene())
-    win.add_child(again)
+    if best_score < score:
+        best_score = score
+    if best_time <= 0.0 or elapsed < best_time:
+        best_time = elapsed
+    _save_game()
+    _show_end_panel(true)
 
 func _take_damage() -> void:
     lives -= 1
@@ -272,24 +318,64 @@ func _take_damage() -> void:
 
 func _game_over() -> void:
     game_started = false
-    var over := Panel.new()
-    over.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    hud.add_child(over)
+    _show_end_panel(false)
+
+func _show_end_panel(won: bool) -> void:
+    end_panel = Panel.new()
+    end_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    hud.add_child(end_panel)
 
     var title := Label.new()
-    title.text = "انتهت اللعبة"
+    title.text = "🎉 أكملت اللعبة!" if won else "انتهت اللعبة"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.position = Vector2(0, 220)
-    title.size = Vector2(1280, 70)
-    title.add_theme_font_size_override("font_size", 42)
-    over.add_child(title)
+    title.position = Vector2(0, 170)
+    title.size = Vector2(1280, 80)
+    title.add_theme_font_size_override("font_size", 46)
+    end_panel.add_child(title)
+
+    var stats := Label.new()
+    stats.text = "العملات: %d\nالوقت: %s\nالمرحلة: %d / %d" % [score, _format_time(elapsed), stage, TOTAL_STAGES]
+    stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    stats.position = Vector2(0, 270)
+    stats.size = Vector2(1280, 130)
+    stats.add_theme_font_size_override("font_size", 25)
+    end_panel.add_child(stats)
 
     var again := Button.new()
-    again.text = "إعادة المحاولة"
-    again.position = Vector2(490, 330)
+    again.text = "العب من جديد"
+    again.position = Vector2(490, 440)
     again.size = Vector2(300, 70)
     again.pressed.connect(func(): get_tree().reload_current_scene())
-    over.add_child(again)
+    end_panel.add_child(again)
+
+func _format_time(value: float) -> String:
+    if value <= 0.0:
+        return "--:--"
+    return "%d:%02d" % [int(value) / 60, int(value) % 60]
+
+func _save_game() -> void:
+    var data := {
+        "best_score": best_score,
+        "best_time": best_time,
+        "skin": selected_skin
+    }
+    var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+    if file:
+        file.store_string(JSON.stringify(data))
+        file.close()
+
+func _load_save() -> void:
+    if not FileAccess.file_exists(SAVE_PATH):
+        return
+    var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+    if not file:
+        return
+    var parsed = JSON.parse_string(file.get_as_text())
+    file.close()
+    if parsed is Dictionary:
+        best_score = int(parsed.get("best_score", 0))
+        best_time = float(parsed.get("best_time", 0.0))
+        selected_skin = clampi(int(parsed.get("skin", 0)), 0, skin_colors.size() - 1)
 
 func _make_box(n: String, size: Vector3, pos: Vector3, color: Color) -> StaticBody3D:
     var body := StaticBody3D.new()
@@ -373,10 +459,10 @@ func _make_hazard(pos: Vector3, speed: float) -> void:
     area.body_entered.connect(_on_hazard.bind(area))
 
 func _on_hazard(body: Node3D, _hazard: Area3D) -> void:
-    if body == player:
+    if body == player and game_started:
         _take_damage()
 
-func _make_goal(z: float, _number: int) -> void:
+func _make_goal(z: float) -> void:
     var portal := MeshInstance3D.new()
     var mesh := TorusMesh.new()
     mesh.inner_radius = 2.0
@@ -393,8 +479,7 @@ func _make_goal(z: float, _number: int) -> void:
     add_child(portal)
 
 func _physics_process(_delta: float) -> void:
-    for i in range(hazards.size()):
-        var h := hazards[i]
+    for h in hazards:
         if is_instance_valid(h):
             var base_x: float = h.get_meta("base_x")
             var speed: float = h.get_meta("speed")
