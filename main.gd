@@ -17,6 +17,7 @@ var best_score := 0
 var best_time := 0.0
 var hazards: Array[Area3D] = []
 var coins: Array[Area3D] = []
+var enemies: Array[Area3D] = []
 
 var hud: CanvasLayer
 var menu_panel: Panel
@@ -98,6 +99,11 @@ func _build_stage(number: int, start_z: float, end_z: float) -> void:
 
     if number >= 6:
         _make_box("Ramp", Vector3(3.5, 0.6, 5.0), Vector3(0, 0.3, start_z - 68.0), Color(0.30, 0.55, 0.90))
+
+    if number >= 3:
+        _make_enemy(Vector3(-3.5, 1.0, start_z - 42.0), 1.5 + difficulty * 1.5, 3.5)
+    if number >= 7:
+        _make_enemy(Vector3(3.0, 1.0, start_z - 70.0), 2.0 + difficulty * 2.0, 2.5)
 
 func _create_player() -> void:
     player = CharacterBody3D.new()
@@ -462,6 +468,52 @@ func _on_hazard(body: Node3D, _hazard: Area3D) -> void:
     if body == player and game_started:
         _take_damage()
 
+func _make_enemy(pos: Vector3, speed: float, range_x: float) -> void:
+    var enemy := Area3D.new()
+    enemy.position = pos
+    enemy.set_meta("base_x", pos.x)
+    enemy.set_meta("base_z", pos.z)
+    enemy.set_meta("speed", speed)
+    enemy.set_meta("range_x", range_x)
+    add_child(enemy)
+    enemies.append(enemy)
+
+    var mesh_instance := MeshInstance3D.new()
+    var mesh := SphereMesh.new()
+    mesh.radius = 0.9
+    mesh.height = 1.8
+    mesh_instance.mesh = mesh
+    var material := StandardMaterial3D.new()
+    material.albedo_color = Color(0.75, 0.12, 0.85)
+    material.emission_enabled = true
+    material.emission = Color(0.25, 0.02, 0.35)
+    mesh_instance.material_override = material
+    enemy.add_child(mesh_instance)
+
+    var eye := MeshInstance3D.new()
+    var eye_mesh := SphereMesh.new()
+    eye_mesh.radius = 0.16
+    eye_mesh.height = 0.32
+    eye.mesh = eye_mesh
+    eye.position = Vector3(0, 0.25, -0.8)
+    var eye_mat := StandardMaterial3D.new()
+    eye_mat.albedo_color = Color(0.95, 0.95, 1.0)
+    eye.material_override = eye_mat
+    enemy.add_child(eye)
+
+    var collision := CollisionShape3D.new()
+    var shape := SphereShape3D.new()
+    shape.radius = 1.0
+    collision.shape = shape
+    enemy.add_child(collision)
+    enemy.body_entered.connect(_on_enemy.bind(enemy))
+
+func _on_enemy(body: Node3D, enemy: Area3D) -> void:
+    if body == player and game_started and is_instance_valid(enemy):
+        _take_damage()
+        player.position = Vector3(0, 2, respawn_z)
+        player.velocity = Vector3.ZERO
+
 func _make_goal(z: float) -> void:
     var portal := MeshInstance3D.new()
     var mesh := TorusMesh.new()
@@ -479,8 +531,18 @@ func _make_goal(z: float) -> void:
     add_child(portal)
 
 func _physics_process(_delta: float) -> void:
+    var now := Time.get_ticks_msec() / 1000.0
     for h in hazards:
         if is_instance_valid(h):
             var base_x: float = h.get_meta("base_x")
             var speed: float = h.get_meta("speed")
-            h.position.x = base_x + sin(Time.get_ticks_msec() / 1000.0 * speed) * 3.0
+            h.position.x = base_x + sin(now * speed) * 3.0
+
+    for enemy in enemies:
+        if is_instance_valid(enemy):
+            var base_x: float = enemy.get_meta("base_x")
+            var base_z: float = enemy.get_meta("base_z")
+            var speed: float = enemy.get_meta("speed")
+            var range_x: float = enemy.get_meta("range_x")
+            enemy.position.x = base_x + sin(now * speed) * range_x
+            enemy.position.z = base_z + cos(now * speed * 0.6) * 2.0
