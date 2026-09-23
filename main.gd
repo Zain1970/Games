@@ -12,6 +12,11 @@ var elapsed := 0.0
 var paused := false
 var game_started := false
 var respawn_z := 4.0
+var checkpoint_stage := 1
+var daily_target := 20
+var daily_progress := 0
+var daily_reward := 50
+var daily_claimed := false
 var selected_skin := 0
 var best_score := 0
 var best_time := 0.0
@@ -235,6 +240,14 @@ func _show_menu() -> void:
         skin_buttons.append(b)
     _refresh_skin_buttons()
 
+    var daily := Label.new()
+    daily.text = "مهمة اليوم: اجمع %d عملة — التقدم %d/%d — الجائزة %d" % [daily_target, daily_progress, daily_target, daily_reward]
+    daily.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    daily.position = Vector2(0, 555)
+    daily.size = Vector2(1280, 45)
+    daily.add_theme_font_size_override("font_size", 18)
+    menu_panel.add_child(daily)
+
     var info := Label.new()
     info.text = "الهاتف: اسحب من يسار الشاشة للحركة واضغط قفز. الكمبيوتر: WASD + Space."
     info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -338,8 +351,9 @@ func _process(delta: float) -> void:
             _win_game()
 
 func _advance_stage(next_stage: int) -> void:
+    checkpoint_stage = next_stage
     stage = next_stage
-    respawn_z = -80.0 * float(stage - 1) + 4.0
+    respawn_z = -80.0 * float(checkpoint_stage - 1) + 4.0
     player.position = Vector3(0, 2, respawn_z)
     player.velocity = Vector3.ZERO
     lives = min(3, lives + 1)
@@ -417,7 +431,10 @@ func _save_game() -> void:
         "unlocked_skins": unlocked_skins,
         "sound_enabled": sound_enabled,
         "music_enabled": music_enabled,
-        "vibration_enabled": vibration_enabled
+        "vibration_enabled": vibration_enabled,
+        "checkpoint_stage": checkpoint_stage,
+        "daily_progress": daily_progress,
+        "daily_claimed": daily_claimed
     }
     var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
     if file:
@@ -447,6 +464,9 @@ func _load_save() -> void:
         sound_enabled = bool(parsed.get("sound_enabled", true))
         music_enabled = bool(parsed.get("music_enabled", true))
         vibration_enabled = bool(parsed.get("vibration_enabled", true))
+        checkpoint_stage = clampi(int(parsed.get("checkpoint_stage", 1)), 1, TOTAL_STAGES)
+        daily_progress = clampi(int(parsed.get("daily_progress", 0)), 0, daily_target)
+        daily_claimed = bool(parsed.get("daily_claimed", false))
 
 func _show_shop() -> void:
     shop_panel = Panel.new()
@@ -610,8 +630,14 @@ func _make_coin(pos: Vector3) -> void:
 
 func _on_coin(body: Node3D, coin: Area3D) -> void:
     if body == player and is_instance_valid(coin):
-        score += 1
+            score += 1
+        daily_progress = mini(daily_target, daily_progress + 1)
+        if daily_progress >= daily_target and not daily_claimed:
+            daily_claimed = true
+            wallet_coins += daily_reward
+            message_label.text = "🎁 أكملت مهمة اليوم! حصلت على %d عملة." % daily_reward
         coin.queue_free()
+        _save_game()
 
 func _make_hazard(pos: Vector3, speed: float) -> void:
     var area := Area3D.new()
