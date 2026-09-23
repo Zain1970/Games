@@ -17,6 +17,7 @@ var daily_target := 20
 var daily_progress := 0
 var daily_reward := 50
 var daily_claimed := false
+var daily_date := ""
 var selected_skin := 0
 var best_score := 0
 var best_time := 0.0
@@ -45,6 +46,7 @@ var pause_button: Button
 var skin_buttons: Array[Button] = []
 var shop_panel: Panel
 var settings_panel: Panel
+var stage_select_panel: Panel
 
 var skin_colors := [
     Color(0.20, 0.65, 1.0),
@@ -56,6 +58,7 @@ var skin_colors := [
 
 func _ready() -> void:
     _load_save()
+    _check_daily_reset()
     _build_world()
     _create_player()
     _create_hud()
@@ -198,15 +201,23 @@ func _show_menu() -> void:
 
     var settings := Button.new()
     settings.text = "الإعدادات"
-    settings.position = Vector2(810, 350)
+    settings.position = Vector2(750, 430)
     settings.size = Vector2(140, 65)
     settings.add_theme_font_size_override("font_size", 22)
     settings.pressed.connect(_show_settings)
     menu_panel.add_child(settings)
 
+    var stages := Button.new()
+    stages.text = "اختيار المرحلة"
+    stages.position = Vector2(330, 430)
+    stages.size = Vector2(200, 60)
+    stages.add_theme_font_size_override("font_size", 20)
+    stages.pressed.connect(_show_stage_select)
+    menu_panel.add_child(stages)
+
     var start := Button.new()
     start.text = "ابدأ اللعبة"
-    start.position = Vector2(490, 350)
+    start.position = Vector2(540, 350)
     start.size = Vector2(300, 75)
     start.add_theme_font_size_override("font_size", 28)
     start.pressed.connect(_start_game)
@@ -284,6 +295,16 @@ func _refresh_skin_buttons() -> void:
         skin_buttons[i].text = label
 
 func _start_game() -> void:
+    stage = clampi(checkpoint_stage, 1, TOTAL_STAGES)
+    respawn_z = -80.0 * float(stage - 1) + 4.0
+    player.position = Vector3(0, 2, respawn_z)
+    player.velocity = Vector3.ZERO
+    score = 0
+    lives = 3
+    elapsed = 0.0
+    damage_cooldown = 0.0
+    paused = false
+    get_tree().paused = false
     game_started = true
     menu_panel.hide()
     pause_button.show()
@@ -434,7 +455,8 @@ func _save_game() -> void:
         "vibration_enabled": vibration_enabled,
         "checkpoint_stage": checkpoint_stage,
         "daily_progress": daily_progress,
-        "daily_claimed": daily_claimed
+        "daily_claimed": daily_claimed,
+        "daily_date": daily_date
     }
     var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
     if file:
@@ -467,6 +489,86 @@ func _load_save() -> void:
         checkpoint_stage = clampi(int(parsed.get("checkpoint_stage", 1)), 1, TOTAL_STAGES)
         daily_progress = clampi(int(parsed.get("daily_progress", 0)), 0, daily_target)
         daily_claimed = bool(parsed.get("daily_claimed", false))
+        daily_date = str(parsed.get("daily_date", ""))
+
+func _check_daily_reset() -> void:
+    var today := Time.get_date_string_from_system()
+    if daily_date == "":
+        daily_date = today
+        _save_game()
+        return
+    if daily_date != today:
+        daily_date = today
+        daily_progress = 0
+        daily_claimed = false
+        _save_game()
+
+func _show_stage_select() -> void:
+    if is_instance_valid(stage_select_panel):
+        stage_select_panel.queue_free()
+    stage_select_panel = Panel.new()
+    stage_select_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    hud.add_child(stage_select_panel)
+
+    var title := Label.new()
+    title.text = "اختيار المرحلة"
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    title.position = Vector2(0, 70)
+    title.size = Vector2(1280, 60)
+    title.add_theme_font_size_override("font_size", 40)
+    stage_select_panel.add_child(title)
+
+    var info := Label.new()
+    info.text = "المراحل المفتوحة حتى المرحلة %d — افتح مراحل جديدة بإكمال المرحلة الحالية." % checkpoint_stage
+    info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    info.position = Vector2(0, 135)
+    info.size = Vector2(1280, 45)
+    info.add_theme_font_size_override("font_size", 18)
+    stage_select_panel.add_child(info)
+
+    for i in range(TOTAL_STAGES):
+        var n := i + 1
+        var b := Button.new()
+        b.text = ("✓ " if n <= checkpoint_stage else "🔒 ") + "المرحلة %d" % n
+        var col := i % 5
+        var row := i / 5
+        b.position = Vector2(170 + col * 195, 220 + row * 115)
+        b.size = Vector2(170, 80)
+        b.add_theme_font_size_override("font_size", 19)
+        b.disabled = n > checkpoint_stage
+        if not b.disabled:
+            b.pressed.connect(_select_stage.bind(n))
+        stage_select_panel.add_child(b)
+
+    var close := Button.new()
+    close.text = "رجوع"
+    close.position = Vector2(490, 470)
+    close.size = Vector2(300, 65)
+    close.pressed.connect(_close_stage_select)
+    stage_select_panel.add_child(close)
+
+func _select_stage(selected_stage: int) -> void:
+    if selected_stage < 1 or selected_stage > checkpoint_stage:
+        return
+    stage = selected_stage
+    respawn_z = -80.0 * float(stage - 1) + 4.0
+    player.position = Vector3(0, 2, respawn_z)
+    player.velocity = Vector3.ZERO
+    score = 0
+    lives = 3
+    elapsed = 0.0
+    game_started = true
+    paused = false
+    get_tree().paused = false
+    if is_instance_valid(stage_select_panel):
+        stage_select_panel.queue_free()
+    if is_instance_valid(menu_panel):
+        menu_panel.hide()
+    message_label.text = "بدأت من المرحلة %d." % stage
+
+func _close_stage_select() -> void:
+    if is_instance_valid(stage_select_panel):
+        stage_select_panel.queue_free()
 
 func _show_shop() -> void:
     shop_panel = Panel.new()
