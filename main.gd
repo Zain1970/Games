@@ -174,8 +174,8 @@ func _create_hud() -> void:
     left_button.anchor_bottom = 1.0
     left_button.offset_top = -110
     left_button.offset_bottom = -35
-    left_button.button_down.connect(func(): if is_instance_valid(player): player.set_mobile_left(true))
-    left_button.button_up.connect(func(): if is_instance_valid(player): player.set_mobile_left(false))
+    left_button.button_down.connect(_mobile_left_down)
+    left_button.button_up.connect(_mobile_left_up)
     hud.add_child(left_button)
 
     right_button = Button.new()
@@ -186,8 +186,8 @@ func _create_hud() -> void:
     right_button.anchor_bottom = 1.0
     right_button.offset_top = -110
     right_button.offset_bottom = -35
-    right_button.button_down.connect(func(): if is_instance_valid(player): player.set_mobile_right(true))
-    right_button.button_up.connect(func(): if is_instance_valid(player): player.set_mobile_right(false))
+    right_button.button_down.connect(_mobile_right_down)
+    right_button.button_up.connect(_mobile_right_up)
     hud.add_child(right_button)
 
     progress_bar = ProgressBar.new()
@@ -382,6 +382,22 @@ func _show_pause_panel() -> void:
     resume.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
     resume.pressed.connect(_toggle_pause)
     pause_panel.add_child(resume)
+
+func _mobile_left_down() -> void:
+    if is_instance_valid(player):
+        player.set_mobile_left(true)
+
+func _mobile_left_up() -> void:
+    if is_instance_valid(player):
+        player.set_mobile_left(false)
+
+func _mobile_right_down() -> void:
+    if is_instance_valid(player):
+        player.set_mobile_right(true)
+
+func _mobile_right_up() -> void:
+    if is_instance_valid(player):
+        player.set_mobile_right(false)
 
 func _jump_player() -> void:
     if game_started and not paused and is_instance_valid(player):
