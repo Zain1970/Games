@@ -10,6 +10,7 @@ var touch_id := -1
 var touch_start := Vector2.ZERO
 var touch_vector := Vector2.ZERO
 var camera: Camera3D
+var body_material: StandardMaterial3D
 
 func _ready() -> void:
     _create_body()
@@ -30,10 +31,10 @@ func _create_body() -> void:
     capsule_mesh.height = 1.8
     mesh_instance.mesh = capsule_mesh
     mesh_instance.position.y = 1.0
-    var material := StandardMaterial3D.new()
-    material.albedo_color = Color(0.20, 0.65, 1.0)
-    material.roughness = 0.65
-    mesh_instance.material_override = material
+    body_material = StandardMaterial3D.new()
+    body_material.albedo_color = Color(0.20, 0.65, 1.0)
+    body_material.roughness = 0.65
+    mesh_instance.material_override = body_material
     add_child(mesh_instance)
 
     var eye := MeshInstance3D.new()
@@ -52,6 +53,11 @@ func _create_camera() -> void:
     camera.position = Vector3(0, 6.5, 10.5)
     add_child(camera)
     camera.current = true
+    camera.fov = 72.0
+
+func set_skin(color: Color) -> void:
+    if body_material:
+        body_material.albedo_color = color
 
 func jump() -> void:
     if is_on_floor():
@@ -100,7 +106,6 @@ func _input(event: InputEvent) -> void:
         elif event.index == touch_id:
             touch_id = -1
             touch_vector = Vector2.ZERO
-
     elif event is InputEventScreenDrag and event.index == touch_id:
         var delta := event.position - touch_start
         touch_vector = delta.limit_length(110.0) / 110.0
