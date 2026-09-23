@@ -53,5 +53,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: GravityFlip-Android
-          path: ${{ steps.export.outputs.build_directory }}/GravityFlip.apk
+          path: /home/runner/.local/share/godot/builds/Android/GravityFlip.apk
           if-no-files-found: error
