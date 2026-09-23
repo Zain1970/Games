@@ -14,9 +14,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Export Android APK
         id: export
         uses: firebelley/godot-export@v7.0.0
