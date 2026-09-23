@@ -101,7 +101,7 @@ func _build_stage(number: int, start_z: float, end_z: float) -> void:
     var difficulty := float(number - 1) / 9.0
     for i in range(9):
         var z := start_z - float(i + 1) * 7.2
-        var x_options := [-4.0, -2.0, 0.0, 2.0, 4.0, 1.5, -1.5, 3.5, -3.5]
+        var x_options: Array[float] = [-4.0, -2.0, 0.0, 2.0, 4.0, 1.5, -1.5, 3.5, -3.5]
         var x := x_options[(i + number) % x_options.size()]
         var width := 2.6 - difficulty * 0.45
         var height := 0.8 + difficulty * 0.5
@@ -341,7 +341,7 @@ func _select_skin(index: int) -> void:
 func _refresh_skin_buttons() -> void:
     var names := ["أزرق", "وردي", "أخضر", "ذهبي", "بنفسجي"]
     for i in range(skin_buttons.size()):
-        var label := names[i]
+        var label: String = names[i]
         if not unlocked_skins[i]:
             label += " 🔒 %d" % skin_prices[i]
         elif i == selected_skin:
