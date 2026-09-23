@@ -630,7 +630,7 @@ func _make_coin(pos: Vector3) -> void:
 
 func _on_coin(body: Node3D, coin: Area3D) -> void:
     if body == player and is_instance_valid(coin):
-            score += 1
+        score += 1
         daily_progress = mini(daily_target, daily_progress + 1)
         if daily_progress >= daily_target and not daily_claimed:
             daily_claimed = true
