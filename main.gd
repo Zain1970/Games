@@ -31,6 +31,7 @@ var skin_prices := [0, 25, 50, 100, 200]
 var hazards: Array[Area3D] = []
 var coins: Array[Area3D] = []
 var enemies: Array[Area3D] = []
+var moving_platforms: Array[AnimatableBody3D] = []
 
 var hud: CanvasLayer
 var menu_panel: Panel
@@ -99,34 +100,56 @@ func _build_world() -> void:
 
 func _build_stage(number: int, start_z: float, end_z: float) -> void:
     var difficulty := float(number - 1) / 9.0
+    var themes := [
+        Color(0.18, 0.50, 0.25),
+        Color(0.20, 0.38, 0.62),
+        Color(0.45, 0.22, 0.58),
+        Color(0.62, 0.30, 0.16),
+        Color(0.16, 0.52, 0.58)
+    ]
+    var accent := themes[(number - 1) % themes.size()]
+
     for i in range(9):
         var z := start_z - float(i + 1) * 7.2
-        var x_options: Array[float] = [-4.0, -2.0, 0.0, 2.0, 4.0, 1.5, -1.5, 3.5, -3.5]
+        var x_options: Array[float] = [-4.2, -2.2, 0.0, 2.2, 4.2, 1.5, -1.5, 3.5, -3.5]
         var x := x_options[(i + number) % x_options.size()]
-        var width := 2.6 - difficulty * 0.45
-        var height := 0.8 + difficulty * 0.5
-        _make_obstacle(Vector3(width, height, 1.3), Vector3(x, height / 2.0, z), Color(0.85, 0.25, 0.22))
-
+        var width := 2.8 - difficulty * 0.55
+        var height := 0.8 + difficulty * 0.45
+        _make_obstacle(Vector3(width, height, 1.25), Vector3(x, height / 2.0, z), accent)
         if i % 2 == 0:
-            _make_coin(Vector3(x, 1.8 + difficulty, z - 2.5))
+            _make_coin(Vector3(x, 1.9 + difficulty, z - 2.3))
+        if i % 3 == 1:
+            _make_coin(Vector3(-x * 0.55, 3.0 + difficulty * 0.5, z - 1.0))
 
-    for i in range(5):
-        var z := start_z - 10.0 - float(i) * 13.0
-        var x := sin(float(i + number) * 1.7) * (4.0 - difficulty * 0.5)
-        _make_coin(Vector3(x, 1.5, z))
+    _make_moving_platform(Vector3(0, 0.45, start_z - 20.0), Vector3(4.0 - difficulty, 0, 0), 1.15 + difficulty * 0.8)
+    if number >= 3:
+        _make_moving_platform(Vector3(-2.5, 0.45, start_z - 48.0), Vector3(5.0, 0, 0), 1.35 + difficulty)
+    if number >= 6:
+        _make_moving_platform(Vector3(2.5, 0.45, start_z - 66.0), Vector3(0, 0, 4.0), 1.0 + difficulty)
 
+    # Later stages deliberately require switching between floor and ceiling.
     if number >= 2:
         _make_hazard(Vector3(-3.0, 1.0, start_z - 28.0), 2.5 + difficulty * 2.5)
     if number >= 4:
         _make_hazard(Vector3(3.0, 1.0, start_z - 55.0), -(3.0 + difficulty * 2.0))
+    if number >= 3:
+        _make_ceiling_obstacle(Vector3(-2.5, 6.35, start_z - 35.0), Vector3(2.4, 0.65, 1.3), accent)
+    if number >= 5:
+        _make_ceiling_obstacle(Vector3(2.8, 6.35, start_z - 61.0), Vector3(2.8, 0.65, 1.3), accent)
 
-    if number >= 6:
+    if number >= 4:
         _make_box("Ramp", Vector3(3.5, 0.6, 5.0), Vector3(0, 0.3, start_z - 68.0), Color(0.30, 0.55, 0.90))
-
     if number >= 3:
         _make_enemy(Vector3(-3.5, 1.0, start_z - 42.0), 1.5 + difficulty * 1.5, 3.5)
     if number >= 7:
         _make_enemy(Vector3(3.0, 1.0, start_z - 70.0), 2.0 + difficulty * 2.0, 2.5)
+
+    var banner := Label3D.new()
+    banner.text = "WORLD %d  •  GRAVITY ZONE" % number
+    banner.position = Vector3(0, 5.6, start_z - 4.0)
+    banner.font_size = 42
+    banner.modulate = accent.lightened(0.25)
+    add_child(banner)
 
 func _create_player() -> void:
     player = CharacterBody3D.new()
@@ -790,6 +813,37 @@ func _make_box(n: String, size: Vector3, pos: Vector3, color: Color) -> StaticBo
 func _make_obstacle(size: Vector3, pos: Vector3, color: Color) -> void:
     _make_box("Obstacle", size, pos, color)
 
+func _make_ceiling_obstacle(pos: Vector3, size: Vector3, color: Color) -> void:
+    _make_box("CeilingObstacle", size, pos, color.darkened(0.15))
+
+func _make_moving_platform(pos: Vector3, travel: Vector3, speed: float) -> void:
+    var platform := AnimatableBody3D.new()
+    platform.name = "MovingPlatform"
+    platform.position = pos
+    platform.set_meta("origin", pos)
+    platform.set_meta("travel", travel)
+    platform.set_meta("speed", speed)
+    add_child(platform)
+    moving_platforms.append(platform)
+
+    var mesh_instance := MeshInstance3D.new()
+    var mesh := BoxMesh.new()
+    mesh.size = Vector3(3.2, 0.45, 2.0)
+    mesh_instance.mesh = mesh
+    var material := StandardMaterial3D.new()
+    material.albedo_color = Color(0.10, 0.75, 0.95)
+    material.emission_enabled = true
+    material.emission = Color(0.02, 0.30, 0.55)
+    material.emission_energy_multiplier = 1.2
+    mesh_instance.material_override = material
+    platform.add_child(mesh_instance)
+
+    var collision := CollisionShape3D.new()
+    var shape := BoxShape3D.new()
+    shape.size = mesh.size
+    collision.shape = shape
+    platform.add_child(collision)
+
 func _make_coin(pos: Vector3) -> void:
     var area := Area3D.new()
     area.position = pos
@@ -945,6 +999,14 @@ func _make_goal(z: float) -> void:
 
 func _physics_process(_delta: float) -> void:
     var now := Time.get_ticks_msec() / 1000.0
+
+    for platform in moving_platforms:
+        if is_instance_valid(platform):
+            var origin: Vector3 = platform.get_meta("origin")
+            var travel: Vector3 = platform.get_meta("travel")
+            var speed: float = platform.get_meta("speed")
+            platform.position = origin + travel * sin(now * speed)
+
     for h in hazards:
         if is_instance_valid(h):
             var base_x: float = h.get_meta("base_x")
