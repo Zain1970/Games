@@ -73,9 +73,9 @@ func _build_world() -> void:
     var env := WorldEnvironment.new()
     var environment := Environment.new()
     environment.background_mode = Environment.BG_COLOR
-    environment.background_color = Color(0.08, 0.12, 0.20)
+    environment.background_color = Color(0.008, 0.008, 0.012)
     environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    environment.ambient_light_color = Color(0.65, 0.75, 1.0)
+    environment.ambient_light_color = Color(0.28, 0.28, 0.32)
     environment.ambient_light_energy = 0.9
     env.environment = environment
     add_child(env)
@@ -86,10 +86,10 @@ func _build_world() -> void:
     sun.shadow_enabled = true
     add_child(sun)
 
-    _make_box("Ground", Vector3(14, 0.5, 820), Vector3(0, -0.5, -405), Color(0.18, 0.50, 0.25))
-    _make_box("Ceiling", Vector3(14, 0.5, 820), Vector3(0, 7.0, -405), Color(0.20, 0.42, 0.58))
-    _make_box("LeftWall", Vector3(0.7, 2.5, 820), Vector3(-7.2, 1.5, -405), Color(0.12, 0.30, 0.48))
-    _make_box("RightWall", Vector3(0.7, 2.5, 820), Vector3(7.2, 1.5, -405), Color(0.12, 0.30, 0.48))
+    _make_box("Ground", Vector3(14, 0.5, 820), Vector3(0, -0.5, -405), Color(0.025, 0.025, 0.03))
+    _make_box("Ceiling", Vector3(14, 0.5, 820), Vector3(0, 7.0, -405), Color(0.04, 0.04, 0.05))
+    _make_box("LeftWall", Vector3(0.7, 2.5, 820), Vector3(-7.2, 1.5, -405), Color(0.015, 0.015, 0.02))
+    _make_box("RightWall", Vector3(0.7, 2.5, 820), Vector3(7.2, 1.5, -405), Color(0.015, 0.015, 0.02))
 
     for number in range(1, TOTAL_STAGES + 1):
         var end_z := -80.0 * number
@@ -253,7 +253,7 @@ func _show_menu() -> void:
     hud.add_child(menu_panel)
 
     var title := Label.new()
-    title.text = "مغامرات 3D"
+    title.text = "AS"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     title.position = Vector2(0, 80)
     title.size = Vector2(1280, 70)
@@ -261,7 +261,7 @@ func _show_menu() -> void:
     menu_panel.add_child(title)
 
     var subtitle := Label.new()
-    subtitle.text = "10 مراحل • عقبات • عملات • تحديات متزايدة"
+    subtitle.text = "AS • BLACK EDITION • 10 مراحل • قلب الجاذبية"
     subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     subtitle.position = Vector2(0, 150)
     subtitle.size = Vector2(1280, 45)
@@ -386,7 +386,7 @@ func _start_game() -> void:
     menu_panel.hide()
     pause_button.show()
     jump_button.show()
-    message_label.text = "ابدأ! أكمل المراحل العشر للوصول إلى النهاية."
+    message_label.text = "AS: ابدأ المغامرة واعكس الجاذبية للوصول إلى النهاية."
 
 func _toggle_pause() -> void:
     if not game_started:
