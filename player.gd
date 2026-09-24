@@ -39,7 +39,7 @@ func _create_body() -> void:
     mesh_instance.mesh = capsule_mesh
     mesh_instance.position.y = 1.0
     body_material = StandardMaterial3D.new()
-    body_material.albedo_color = Color(0.20, 0.65, 1.0)
+    body_material.albedo_color = Color(0.03, 0.03, 0.04)
     body_material.roughness = 0.65
     mesh_instance.material_override = body_material
     add_child(mesh_instance)
