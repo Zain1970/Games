@@ -2,7 +2,7 @@
 config_version=5
 
 [application]
-config/name="Gravity Flip: عالم الانقلاب"
+config/name="AS"
 run/main_scene="res://Main.tscn"
 config/icon="res://icon.svg"
 config/features=PackedStringArray("4.3", "GL Compatibility")
